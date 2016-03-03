@@ -9,23 +9,8 @@ function handleConversationStats(conversation) {
   var packets = 0;
 
   setInterval(function() {
-    Works in FireFox
-    peerConnection.getStats(selector, function(report) {
-      for(var i in report) {
-        var currentReport = report[i];
-        if(currentReport.type === 'outboundrtp') {
-          console.log(currentReport);
-          packets += currentReport.packetsSent;
-        }
-      }
-      console.log('Number of packets sent so far: ' + packets);
-    }, function(error) {
-      console.log('Oh no I messed up: ' + error);
-    });
-
-    // Doesn't work in Chrome yet
-    // peerConnection.getStats(function(report) {
-    //   console.log(report);
+    // Works in FireFox
+    // peerConnection.getStats(selector, function(report) {
     //   for(var i in report) {
     //     var currentReport = report[i];
     //     if(currentReport.type === 'outboundrtp') {
@@ -34,14 +19,47 @@ function handleConversationStats(conversation) {
     //     }
     //   }
     //   console.log('Number of packets sent so far: ' + packets);
-    // }, selector, function(error) {
+    // }, function(error) {
     //   console.log('Oh no I messed up: ' + error);
     // });
+
+    // Works in Chrome
+    peerConnection.getStats(function(report) {
+      report = standardizeReport(report);
+      console.log(report);
+
+      for(var i in report) {
+        var currentReport = report[i];
+        if(currentReport.type === 'ssrc' && currentReport.packetsSent) {
+          console.log(currentReport);
+          packets += parseInt(currentReport.packetsSent, 10);
+        }
+      }
+      console.log('Number of packets sent so far: ' + packets);
+    }, selector, function(error) {
+      console.log('Oh no I messed up: ' + error);
+    });
   }, 5000);
 }
 
-function standardizeReport(report) {
-  // Implement this next.
+function standardizeReport(response) {
+  if(navigator.mozGetUserMedia) {
+    return response;
+  }
+
+  var standardReport = {};
+  response.result().forEach(function(report) {
+    var standardStats = {
+      id: report.id,
+      type: report.type,
+    };
+    report.names().forEach(function(name) {
+      standardStats[name] = report.stat(name);
+    });
+    standardReport[standardStats.id] = standardStats;
+  });
+
+  return standardReport;
 }
 
 function onInviteAccepted(conversation) {

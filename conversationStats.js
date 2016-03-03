@@ -2,6 +2,19 @@ var accessToken = '';
 var accessManager = Twilio.AccessManager(accessToken);
 var client = Twilio.Conversations.Client(accessManager);
 
+function getStats(peerConnection, selector, successCb, failureCb) {
+  if(navigator.mozGetUserMedia) {
+    // User is using FireFox
+    return peerConnection.getStats(selector, successCb, failureCb);
+  } else {
+    // User is using Chrome
+    return peerConnection.getStats(function(response) {
+      var report = standardizeReport(response);
+      successCb(report);
+    }, selector, failureCb);
+  }
+}
+
 function handleConversationStats(conversation) {
   var dialog = conversation._dialogs.values().next().value;
   var peerConnection = dialog.session.mediaHandler.peerConnection;
@@ -9,34 +22,26 @@ function handleConversationStats(conversation) {
   var packets = 0;
 
   setInterval(function() {
-    // Works in FireFox
-    // peerConnection.getStats(selector, function(report) {
-    //   for(var i in report) {
-    //     var currentReport = report[i];
-    //     if(currentReport.type === 'outboundrtp') {
-    //       console.log(currentReport);
-    //       packets += currentReport.packetsSent;
-    //     }
-    //   }
-    //   console.log('Number of packets sent so far: ' + packets);
-    // }, function(error) {
-    //   console.log('Oh no I messed up: ' + error);
-    // });
-
-    // Works in Chrome
-    peerConnection.getStats(function(report) {
-      report = standardizeReport(report);
-      console.log(report);
-
+    // Works in FireFox and Chrome (I hope)
+    getStats(peerConnection, selector, function(report) {
       for(var i in report) {
         var currentReport = report[i];
-        if(currentReport.type === 'ssrc' && currentReport.packetsSent) {
-          console.log(currentReport);
-          packets += parseInt(currentReport.packetsSent, 10);
+
+        if(navigator.mozGetUserMedia) {
+          if(currentReport.type === 'outboundrtp') {
+            console.log(currentReport);
+            packets += currentReport.packetsSent;
+          }
+        } else {
+          if(currentReport.type === 'ssrc' && currentReport.packetsSent) {
+            console.log(currentReport);
+            packets += parseInt(currentReport.packetsSent, 10);
+          }
         }
       }
+
       console.log('Number of packets sent so far: ' + packets);
-    }, selector, function(error) {
+    }, function(error) {
       console.log('Oh no I messed up: ' + error);
     });
   }, 5000);
